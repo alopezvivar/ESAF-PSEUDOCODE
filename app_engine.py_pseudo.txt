@@ -1,0 +1,297 @@
+IMPORT os
+
+IMPORT time
+
+IMPORT dependencies_builder
+
+IMPORT constants
+
+IMPORT mdcontracts
+
+IMPORT docker
+
+IMPORT exceptions
+
+IMPORT logging
+
+
+
+SET docker_client TO docker.APIClient(base_url='unix://var/run/docker.sock')
+
+SET logger TO logging.getLogger(constants.LOGGER_NAME)
+
+
+
+
+
+# TODO: continuar desarrollando la funcion intermedia que devuelve todas las ejecuciones que hay que realizar
+
+DEFINE FUNCTION intermediate_exec(tool, cmd, version):
+
+    TRY:
+
+	    IF version != '':
+
+	        SET version TO int(version.replace(".", ""))
+
+	    IF tool.get("name") EQUALS 'securify' and version <= 510:
+
+	        RETURN '', 0
+
+	    IF tool.get("name") EQUALS 'slither' and version <= 430:
+
+	        IF version <= 430:
+
+	            cmd.format(version)
+
+	        ELSE:
+
+	            RETURN 'Unable to run analysis because solidity pragma code version.', 0
+
+    EXCEPT:
+
+    	PASS
+
+
+
+    SET executions TO [docker_client.exec_create(tool.get('container'), cmd=cmd, workdir=tool.get('workdir'),
+
+                                            privileged=True)]
+
+    IF tool.get("name") EQUALS 'solmet':
+
+        executions.append(docker_client.exec_create(tool.get('container'), cmd='cat output.csv',
+
+                                                    workdir=tool.get('workdir'),
+
+                                                    privileged=True))
+
+    IF tool.get("name") EQUALS 'ethir':
+
+        executions.append(docker_client.exec_create(tool.get('container'), cmd='cat rbr.rbr',
+
+                                                    workdir='/tmp/costabs/',
+
+                                                    privileged=True))
+
+    IF tool.get("name") EQUALS 'madmax':
+
+        executions.append(docker_client.exec_create(tool.get('container'), cmd='cat graph.html',
+
+                                                    workdir='/home/MadMax/',
+
+                                                    privileged=True))
+
+
+
+    SET result TO ''
+
+    FOR exe IN executions:
+
+        SET time_start TO time.perf_counter()
+
+        SET res_iter TO docker_client.exec_start(exe, stream=True, demux=True)
+
+        SET time_end TO time.perf_counter()
+
+        FOR line IN res_iter:
+
+            IF line[0]:
+
+                result += line[0].decode('utf-8')
+
+            IF line[1]:
+
+                result += line[1].decode('utf-8')
+
+            result += '\n'
+
+    RETURN result, (time_end - time_start)
+
+
+
+
+
+DEFINE FUNCTION get_tool():
+
+    FOR tool IN constants.TOOLS_PROPERTIES:
+
+        IF tool.get('name') EQUALS constants.DEFAULT_TOOL:
+
+            SET ret TO tool
+
+    RETURN ret
+
+
+
+
+
+DEFINE FUNCTION get_version(tool, path):
+
+    IF tool.get('ext') EQUALS '.sol':
+
+        RETURN dependencies_builder.get_version(path)
+
+    ELSE:
+
+        RETURN ''
+
+
+
+
+
+DEFINE FUNCTION exec_start_gui(files, tools):
+
+    SET results TO ""
+
+    FOR tool IN tools:
+
+        IF tool.get('ext') EQUALS '.sol':
+
+            SET file TO files[0]
+
+        ELSE:
+
+            SET file TO files[1]
+
+        IF file EQUALS 'nofile':
+
+            break
+
+        SET path TO os.path.join(constants.DEFAULT_DIRECTORY + constants.DEFAULT_INPUT, file)
+
+        IF os.path.isfile(path):
+
+            SET version TO get_version(tool, path)
+
+            IF tool.get('name') EQUALS 'mythril':
+
+                SET cmd TO tool.get("cmd").format(version, file)
+
+            ELSEIF tool.get("name") EQUALS 'slither':
+
+                SET cmd TO tool.get("cmd").format(constants.SOLC_SLITHER.format(version), file)
+
+            ELSE:
+
+                SET cmd TO tool.get("cmd").format(file)
+
+            SET result, time_elapsed TO intermediate_exec(tool, cmd, version)
+
+        ELSE:
+
+            SET result TO "{} doesn't allow {} files format".format(tool.get('name'))
+
+            SET time_elapsed TO 0
+
+        results += "Herramienta: {} Resultado: {} Tiempo ejecución: {}\n{}\n\n\n\n".format(tool.get('name'), result,
+
+                                                                                   time_elapsed, constants.EOF_STRING)
+
+    RETURN results
+
+
+
+
+
+# Se corren todas las herramientas diferenciando por analisis
+
+DEFINE FUNCTION exec_start(files, contract, tools):
+
+    FOR tool IN tools:
+
+        IF tool.get('ext') EQUALS '.sol':
+
+            SET file TO files[0]
+
+        ELSE:
+
+            SET file TO files[1]
+
+        SET path TO os.path.join(constants.DEFAULT_DIRECTORY + constants.DEFAULT_INPUT, file)
+
+        IF os.path.isfile(path):
+
+            SET version TO get_version(tool, path)
+
+            IF tool.get('name') EQUALS 'mythril' :
+
+                SET cmd TO tool.get("cmd").format(version, file)
+
+            ELSEIF tool.get("name") EQUALS 'slither':
+
+                SET cmd TO tool.get("cmd").format(constants.SOLC_SLITHER.format(version), file)
+
+            ELSE:
+
+                SET cmd TO tool.get("cmd").format(file)
+
+            logger.debug("Running {} ...".format(tool.get('name')))
+
+            SET result, time_elapsed TO intermediate_exec(tool, cmd, version)
+
+            logger.debug("Completed. Saving results...")
+
+            mdcontracts.insert_result(contract.get_id(), contract.get_address(), tool.get('name'), result, time_elapsed)
+
+            logger.debug("Completed.")
+
+        ELSE:
+
+            mdcontracts.insert_result(contract.get_id(), contract.get_address(), tool.get('name'),
+
+                                      "Contract extension doesn't allow this analysis", '0')
+
+
+
+
+
+DEFINE FUNCTION execute_command(files, contract):
+
+    IF constants.DEFAULT_TOOL EQUALS 'all':
+
+        exec_start(files, contract, constants.TOOLS_PROPERTIES)
+
+    ELSE:
+
+        SET custom_tools_properties TO []
+
+        FOR tool IN constants.TOOLS_PROPERTIES:
+
+            IF tool IN constants.DEFAULT_TOOL:
+
+                custom_tools_properties.append(tool)
+
+        exec_start(files, contract, custom_tools_properties)
+
+
+
+
+
+DEFINE FUNCTION init():
+
+    SET containers_running TO docker_client.containers(all=True)
+
+    SET final_name_list TO list()
+
+
+
+    FOR c IN containers_running:
+
+        SET name_list TO c['Names']
+
+        IF len(name_list) > 0:
+
+            final_name_list += name_list
+
+
+
+    FOR container IN constants.CONTAINERS:
+
+        TRY:
+
+            docker_client.start(container)
+
+        EXCEPT:
+
+            logger.WARNING("The awaiten docker {} doesn't exits".format(container))

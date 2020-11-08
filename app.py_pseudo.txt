@@ -1,0 +1,328 @@
+IMPORT os
+
+IMPORT argparse
+
+IMPORT dependencies_builder
+
+IMPORT constants
+
+IMPORT mdcontracts
+
+IMPORT docker
+
+IMPORT exceptions
+
+IMPORT logging
+
+IMPORT app_engine
+
+from multiprocessing IMPORT Process, Lock
+
+
+
+from pathlib IMPORT Path
+
+
+
+# HOST
+
+
+
+SET VERSION TO 0.6
+
+
+
+SET docker_client TO docker.APIClient(base_url='unix://var/run/docker.sock')
+
+SET logger TO logging.getLogger(constants.LOGGER_NAME)
+
+
+
+
+
+DEFINE FUNCTION analyze(contract):
+
+    TRY:
+
+        SET INPUT_sol_file TO 'INPUT_' + contract.get_name() + '.sol'
+
+        SET INPUT_hex_file TO 'INPUT_' + contract.get_name() + '.hex'
+
+
+
+        SET files TO [INPUT_sol_file, INPUT_hex_file]
+
+        logger.info("Analyzing contract number {}".format(contract.get_id()))
+
+        app_engine.execute_command(files, contract)
+
+        logger.info("{} contract analyze ended.".format(contract.get_id()))
+
+    EXCEPT:
+
+        logger.exception("Get exception analyzing contract id: {}".format(contract.get_id()))
+
+
+
+
+
+DEFINE FUNCTION test():
+
+    SET cont TO 1
+
+    SET c_contracts TO mdcontracts.get_all_contract_id()
+
+    FOR contract IN c_contracts:
+
+        SET c TO dependencies_builder.create_contract(contract['contract_id'])
+
+        analyze(c)
+
+        IF (cont % 50) EQUALS 0:
+
+            dependencies_builder.clean_INPUT_folder()
+
+            logger.info("Cleaning INPUTs files from {}".format(constants.DEFAULT_INPUT))
+
+        SET cont TO cont + 1
+
+    c_contracts.close()
+
+
+
+
+
+DEFINE FUNCTION test_sigle_contract(param, is_address):
+
+    IF is_address:
+
+        SET id TO mdcontracts.get_contract_by_address(param)['contract_id']
+
+    ELSE:
+
+        SET id TO mdcontracts.get_contract(param)['contract_id']
+
+    SET c TO dependencies_builder.create_contract(id)
+
+    analyze(c)
+
+
+
+
+
+DEFINE FUNCTION test_range(*args):
+
+    SET processes TO []
+
+    SET cont TO 1
+
+    IF len(args) EQUALS 2:
+
+        SET lengh TO args[1] - args[0]
+
+    ELSE:
+
+        SET lengh TO 100000 - args[0]
+
+    FOR i IN range(0, lengh):
+
+            IF i % 100 EQUALS 0:
+
+                SET update_count TO 100 * (i / 100)
+
+                SET c_contracts TO mdcontracts.get_range_contract(args[0] + update_count, args[1] + update_count)
+
+            SET id TO c_contracts.next()['contract_id']
+
+            SET c TO dependencies_builder.create_contract(id)
+
+            analyze(c)
+
+            SET cont TO cont + 1
+
+
+
+
+
+
+
+DEFINE FUNCTION define_logger():
+
+    SET logger TO logging.getLogger(constants.LOGGER_NAME)
+
+    logger.setLevel(logging.DEBUG)
+
+    # Log file
+
+    SET fh TO logging.FileHandler(constants.LOG_FILENAME)
+
+    fh.setLevel(logging.DEBUG)
+
+    # Console
+
+    SET ch TO logging.StreamHandler()
+
+    ch.setLevel(logging.INFO)
+
+
+
+    SET formater TO logging.Formatter('%(asctime)s %(message)s', datefmt='%d/%m/%Y %I:%M:%S %p')
+
+
+
+    ch.setFormatter(formater)
+
+    fh.setFormatter(formater)
+
+    logger.addHandler(fh)
+
+    logger.addHandler(ch)
+
+
+
+
+
+# TODO: poner la variables -d para añadir una bbdd o -c para setear el nombre de la coleccion
+
+# TODO: modificar la lista para poner valores por defecto
+
+DEFINE FUNCTION main():
+
+    define_logger()
+
+    SET info TO []
+
+    SET parser TO argparse.ArgumentParser()
+
+    parser.add_argument("-t", "--test", help="Launch default test.",
+
+                        action="store_true")
+
+    parser.add_argument("-i", "--identifier", type=str, help="Analyze the given identifier. Choose a number"
+
+                                                                   "or address")
+
+    parser.add_argument("-r", "--range", nargs='+', type=int,
+
+                        help="Analyze the given INPUT number range contracts (both included).")
+
+    parser.add_argument("-fn", "--from-number", type=int,
+
+                        help="Analyze from given INPUT number (included) contract UNTIL last one.")
+
+    parser.add_argument("-d", "--directory", type=str, help="Custom output directory.")
+
+    parser.add_argument("-s", "--select-tool", nargs='+', type=str, help="Select one "
+
+                                                              "specific tool. Available tools: solgraph, oyente, "
+
+                                                              "smartcheck, solmet, osiris, vandal, ethir, mythril,"
+
+                                                              "securify, slither, manticore, madmax")
+
+
+
+    SET args TO parser.parse_args()
+
+    SET constants.DEFAULT_DIRECTORY TO os.getcwd()
+
+
+
+    logger.info('Execution begins')
+
+    logger.info('Current working directory set to ' + constants.DEFAULT_DIRECTORY)
+
+
+
+    app_engine.init()
+
+
+
+    TRY:
+
+        IF args.select_tool:
+
+            SET tools TO []
+
+            FOR i IN range(0, len(args.select_tool)):
+
+                IF str.lower(args.select_tool[i]) IN constants.TOOLS:
+
+                    tools.append(str.lower(args.select_tool[i]))
+
+                ELSE:
+
+                    logger.info("{} is not admitted, check whether is not bad written".format(args.select_tool[i]))
+
+            SET constants.DEFAULT_TOOL TO tools
+
+        IF args.directory:
+
+            logger.info('Own output directory selected -> ' + args.directory)
+
+            dependencies_builder.create_output_dir(args.directory)
+
+        IF args.test and (args.identifier is None and args.range is None and args.from_number is None):
+
+            logger.info('Default test selected')
+
+            test()
+
+        ELSEIF args.identifier:
+
+            SET is_address TO dependencies_builder.is_address(args.identifier)
+
+            IF is_address:
+
+                logger.info('Unique contract test selected. Address {}'.format(args.identifier))
+
+            ELSE:
+
+                logger.info('Unique contract test selected. Contract number {}'.format(args.identifier))
+
+            test_sigle_contract(args.identifier, is_address)
+
+        ELSEIF args.range:
+
+            IF args.range[0] < 0 or args.range[1] < 0:
+
+                raise exceptions.InputError('parser', 'The range can not be less than 0')
+
+            ELSEIF (isinstance(args.range[0], int) or isinstance(args.range[1], int)) is not True:
+
+                raise exceptions.InputError('parser', 'The range must be a number')
+
+            ELSE:
+
+                logger.info('Range test selected. Range: {} - {}'.format(args.range[0], args.range[1]))
+
+                test_range(args.range[0], args.range[1])
+
+        ELSEIF args.from_number:
+
+            IF args.from_number < 0 or isinstance(args.from_number, int) is not True:
+
+                raise exceptions.InputError('parser', 'The range must be a number and higher than 0')
+
+            ELSE:
+
+                logger.info('Range from number selected. Range: {} - end'.format(args.from_number))
+
+                test_range(args.from_number)
+
+        ELSE:
+
+            raise exceptions.InputError('You must select a value')
+
+    EXCEPT:
+
+        logger.exception('Got exception parsing arguments')
+
+
+
+
+
+IF __name__ EQUALS "__main__":
+
+    main()
+

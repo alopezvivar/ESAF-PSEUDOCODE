@@ -1,0 +1,74 @@
+DEFINE CLASS Contract:
+
+    DEFINE FUNCTION __init__(self, id):
+
+        SET self.id TO id
+
+        SET self.name TO 'contract_' + str(id)
+
+        SET self.extensions TO []
+
+
+
+    DEFINE FUNCTION get_extensions(self):
+
+        RETURN self.extensions
+
+
+
+    DEFINE FUNCTION set_extensions(self, extensions):
+
+        SET self.extensions TO extensions
+
+
+
+    DEFINE FUNCTION set_content_by_extension(self, ext, content):
+
+        SET self.content[ext] TO content
+
+        self.extensions.push(ext)
+
+
+
+    DEFINE FUNCTION get_content_by_extension(self, ext):
+
+        RETURN self.content.get(ext)
+
+
+
+    DEFINE FUNCTION get_name(self):
+
+        RETURN self.name
+
+
+
+    DEFINE FUNCTION get_content(self):
+
+        RETURN self.content
+
+
+
+    DEFINE FUNCTION set_content(self, content):
+
+        SET self.content TO content
+
+
+
+    DEFINE FUNCTION get_address(self):
+
+        RETURN self.address
+
+
+
+    DEFINE FUNCTION set_address(self, address):
+
+        SET self.address TO address
+
+
+
+    DEFINE FUNCTION get_id(self):
+
+        RETURN self.id
+
+
+

@@ -1,0 +1,454 @@
+SET MONGO_DATABASE TO 'mydb'
+
+SET MONGO_COLLECTION TO 'contratos_full_2019_def'
+
+SET MONGO_RESULTS_DATABASE TO 'results_db'
+
+SET MONGO_RESULTS_COLLECTION TO 'outputs_emsaf_madmax_solgraph_2019'
+
+SET DEFAULT_DIRECTORY TO '/Users/Ture/Documents/TFG'
+
+SET DEFAULT_INPUT TO '/INPUTs'
+
+SET DEFAULT_OUTPUT TO 'resultados'
+
+SET DEFAULT_TOOL TO 'all'
+
+SET LOG_FILENAME TO 'stack_trace.log'
+
+SET LOGGER_NAME TO 'Default_logger'
+
+SET PROGRESS_BAR_LEN TO 180
+
+SET output_created TO False
+
+
+
+SET SOLC_SLITHER TO '/home/slither/.py-solc/solc-v{}/bin/solc'
+
+
+
+SET EOF_STRING TO '-----------------------!!!-----------------------'
+
+
+
+SET #TOOLS TO ['solgraph', 'oyente', 'smartcheck', 'solmet', 'osiris', 'vandal', 'ethir', 'mythril', 'securify', 'slither', 'manticore','madmax']
+
+
+
+SET #TOOLS TO ['solgraph', 'oyente', 'smartcheck', 'solmet', 'osiris', 'vandal', 'ethir', 'mythril', 'securify', 'slither', 'manticore']
+
+
+
+SET TOOLS TO ['oyente', 'smartcheck', 'solmet', 'osiris', 'vandal', 'ethir', 'mythril', 'securify', 'slither', 'manticore']
+
+
+
+SET CONTAINERS TO ['vsolgraph', 'voyente', 'vsolmet', 'vethir', 'vosiris', 'vvandal', 'vsmartcheck', 'vmythril','vsecurify',
+
+              'vslither', 'vmanticore', 'vmadmax']
+
+
+
+
+
+SET TOOLS_PROPERTIES TO [
+
+   # {
+
+    #    "name" : "solgraph",
+
+     #   "container": "vsolgraph",
+
+      #  "workdir": "/tmp/INPUTs/",
+
+      #  "cmd": "solgraph {0} > {0}.dot",
+
+       # "ext": ".sol"
+
+    #},
+
+    {
+
+        "name" : "smartcheck",
+
+        "container": "vsmartcheck",
+
+        "workdir": "/tmp/INPUTs/",
+
+        "cmd": "smartcheck -p {0} ",
+
+        "ext": ".sol"
+
+    },
+
+    {
+
+        "name" : "solmet",
+
+        "container": "vsolmet",
+
+        "workdir": "/home/SolMet-Solidity-parser/target/",
+
+        "cmd": "java -jar SolMet-1.0-SNAPSHOT.jar -INPUTFile /tmp/INPUTs/{0} -outFile output.csv",
+
+        "ext": ".sol"
+
+    },
+
+    {
+
+        "name" : "oyente",
+
+        "container": "voyente",
+
+        "workdir": "/oyente/oyente/",
+
+        "cmd": "python oyente.py -s /tmp/INPUTs/{} -b",
+
+        "ext": ".hex"
+
+    },
+
+    {
+
+        "name" : "osiris",
+
+        "container": "vosiris",
+
+        "workdir": "/root/osiris",
+
+        "cmd": "python osiris.py -s /tmp/INPUTs/{} -b",
+
+        "ext" : ".hex"
+
+    },
+
+    {
+
+        "name" : "ethir",
+
+        "container": "vethir",
+
+        "workdir": "/home/EthIR/ethir/",
+
+        "cmd": "python oyente-ethir.py -s /tmp/INPUTs/{} -b",
+
+        "ext": ".hex"
+
+    },
+
+    {
+
+        "name" : "vandal",
+
+        "container": "vvandal",
+
+        "workdir": "/home/vandal/bin/",
+
+        "cmd": "bash ./analyze.sh /tmp/INPUTs/{} ../datalog/demo_analyses.dl",
+
+        "ext": ".hex"
+
+    },
+
+    {
+
+        "name" : "mythril",
+
+        "container": "vmythril",
+
+        "workdir": "/home/mythril",
+
+        "cmd": "myth analyze  --solv {} /tmp/INPUTs/{} --execution-timeout 60 --max-depth 20",
+
+        "ext": ".sol"
+
+    },
+
+    {
+
+        "name" : "securify",
+
+        "container": "vsecurify",
+
+        "workdir": "/sec",
+
+        "cmd": "securify /tmp/INPUTs/{}",
+
+        "ext": ".sol"
+
+    },
+
+    {
+
+        "name" : "slither",
+
+        "container": "vslither",
+
+        "workdir": "/home/slither/slither",
+
+        "cmd": "slither /tmp/INPUTs/{1} --solc {0}",
+
+        "ext": ".sol"
+
+    },
+
+    {
+
+        "name" : "manticore",
+
+        "container": "vmanticore",
+
+        "workdir": "/manticore",
+
+        "cmd": "manticore /tmp/INPUTs/{} --solc-solcs-bin solc-0.4.26,solc-0.4.25,solc-0.4.24,solc-0.4.23,solc-0.4.21,"
+
+               "solc-0.4.20,solc-0.4.19,solc-0.4.18,solc-0.4.17,solc-0.4.16,solc-0.4.1",
+
+        "ext": ".sol"
+
+    }
+
+    #,
+
+   # {
+
+    #    "name" : "madmax",
+
+     #   "container": "vmadmax",
+
+      #  "workdir": "/home/MadMax",
+
+       # "cmd": "bin/decompile -n -v -g graph.html /tmp/INPUTs/{}",
+
+        #"ext": ".hex"
+
+    #}
+
+]
+
+
+
+
+
+
+
+SET SOL_TOOLS TO [
+
+#{
+
+ #       "name" : "solgraph",
+
+  #      "container": "vsolgraph",
+
+   #     "workdir": "/tmp/INPUTs/",
+
+    #    "cmd": "solgraph {0} > {0}.dot",
+
+     #   "ext": ".sol"
+
+    #},
+
+    {
+
+        "name" : "smartcheck",
+
+        "container": "vsmartcheck",
+
+        "workdir": "/tmp/INPUTs/",
+
+        "cmd": "smartcheck -p {0} ",
+
+        "ext": ".sol"
+
+    },
+
+    {
+
+        "name" : "solmet",
+
+        "container": "vsolmet",
+
+        "workdir": "/home/SolMet-Solidity-parser/target/",
+
+        "cmd": "java -jar SolMet-1.0-SNAPSHOT.jar -INPUTFile ../../../tmp/INPUTs/{0} -outFile output.csv",
+
+        "ext": ".sol"
+
+    },
+
+{
+
+        "name" : "oyente",
+
+        "container": "voyente",
+
+        "workdir": "/oyente/oyente/",
+
+        "cmd": "python oyente.py -s ../../tmp/INPUTs/{} -b",
+
+        "ext": ".hex"
+
+    },
+
+    {
+
+        "name" : "osiris",
+
+        "container": "vosiris",
+
+        "workdir": "/root/osiris",
+
+        "cmd": "python osiris.py -s /tmp/INPUTs/{} -b",
+
+        "ext" : ".hex"
+
+    },
+
+    {
+
+        "name" : "ethir",
+
+        "container": "vethir",
+
+        "workdir": "/home/EthIR/ethir/",
+
+        "cmd": "python oyente-ethir.py -s ../../../tmp/INPUTs/{} -b",
+
+        "ext": ".hex"
+
+    },
+
+    {
+
+        "name" : "vandal",
+
+        "container": "vvandal",
+
+        "workdir": "/home/vandal/bin/",
+
+        "cmd": "bash ./analyze.sh ../../../tmp/INPUTs/{} ../datalog/demo_analyses.dl",
+
+        "ext": ".hex"
+
+    },{
+
+        "name" : "mythril",
+
+        "container": "mythril",
+
+        "workdir": "/home/mythril",
+
+        "cmd": "myth analyze  --solv {} ../../tmp/INPUTs/{}",
+
+        "ext": ".sol"
+
+    },
+
+    {
+
+        "name" : "securify",
+
+        "container": "securify",
+
+        "workdir": "/sec",
+
+        "cmd": "securify ../../tmp/INPUTs/{}",
+
+        "ext": ".sol"
+
+    },
+
+    {
+
+        "name" : "solgraph",
+
+        "container": "vsolgraph",
+
+        "workdir": "/tmp/INPUTs/",
+
+        "cmd": "solgraph {0} > {0}.dot"
+
+    },
+
+    {
+
+        "name" : "smartcheck",
+
+        "container": "vsmartcheck",
+
+        "workdir": "/tmp/INPUTs/",
+
+        "cmd": "smartcheck -p {0} "
+
+    },
+
+    {
+
+        "name" : "solmet",
+
+        "container": "vsolmet",
+
+        "workdir": "/home/SolMet-Solidity-parser/target/",
+
+        "cmd": "java -jar SolMet-1.0-SNAPSHOT.jar -INPUTFile ../../../tmp/INPUTs/{0} -outFile output.csv"
+
+    },
+
+]
+
+SET HEX_TOOLS TO [
+
+    {
+
+        "name" : "oyente",
+
+        "container": "voyente",
+
+        "workdir": "/oyente/oyente/",
+
+        "cmd": "python oyente.py -s ../../tmp/INPUTs/{} -b"
+
+    },
+
+    {
+
+        "name" : "osiris",
+
+        "container": "vosiris",
+
+        "workdir": "/osiris/",
+
+        "cmd": "python osiris.py -s ../tmp/INPUTs/{} -b"
+
+    },
+
+    {
+
+        "name" : "ethir",
+
+        "container": "vethir",
+
+        "workdir": "/home/EthIR/ethir/",
+
+        "cmd": "python oyente-ethir.py -s ../../../tmp/INPUTs/{} -b"
+
+    },
+
+    {
+
+        "name" : "vandal",
+
+        "container": "vvandal",
+
+        "workdir": "/home/vandal/bin/",
+
+        "cmd": "analyze.sh ../../../tmp/INPUTs/{} ../datalog/demo_analyses.dl"
+
+    }
+
+]
+
+
+

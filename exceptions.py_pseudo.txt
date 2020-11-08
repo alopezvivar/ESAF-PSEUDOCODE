@@ -1,0 +1,32 @@
+DEFINE CLASS Error(Exception):
+
+    """Base DEFINE CLASS FOR exceptions IN this module."""
+
+    PASS
+
+
+
+
+
+DEFINE CLASS InputError(Error):
+
+    """Exception raised FOR errors IN the INPUT.
+
+
+
+    Attributes:
+
+        expression -- INPUT expression IN which the error occurred
+
+        message -- explanation of the error
+
+    """
+
+
+
+    DEFINE FUNCTION __init__(self, expression, message):
+
+        SET self.expression TO expression
+
+        SET self.message TO message
+

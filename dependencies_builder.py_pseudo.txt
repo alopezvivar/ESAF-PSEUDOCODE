@@ -1,0 +1,202 @@
+IMPORT shutil
+
+IMPORT constants
+
+IMPORT mdcontracts
+
+IMPORT os
+
+IMPORT logging
+
+IMPORT tempfile
+
+from contract_class IMPORT Contract
+
+
+
+SET logger TO logging.getLogger(constants.LOGGER_NAME)
+
+
+
+
+
+DEFINE FUNCTION get_content(id):
+
+    SET bytecode TO mdcontracts.get_contract(id)['bytecode']
+
+    SET solidity_code TO mdcontracts.get_contract(id)['solidity']
+
+    SET content TO {}
+
+    SET extensions TO []
+
+    SET address TO mdcontracts.get_contract(id)['address']
+
+    IF str(bytecode) != '0x':
+
+        SET content['hex'] TO str.split(str(bytecode), 'x')[1]
+
+        extensions.append('.hex')
+
+    IF type(solidity_code) is list:
+
+        SET content['sol'] TO solidity_code[0].get('SourceCode')
+
+        extensions.append('.sol')
+
+    RETURN content, extensions, address
+
+
+
+
+
+# Input file creation method
+
+DEFINE FUNCTION doc_creation(contract):
+
+    SET name TO contract.get_name()
+
+    FOR ext IN contract.extensions:
+
+        SET INPUT_file TO "INPUT_{}{}".format(name, ext)
+
+        SET path_to_INPUT_file TO os.path.join(constants.DEFAULT_DIRECTORY + constants.DEFAULT_INPUT, INPUT_file)
+
+        SET f TO open(path_to_INPUT_file, "w+")
+
+        SET content TO contract.get_content_by_extension(str.split(ext, '.')[1])
+
+        f.write(content)
+
+        f.close()
+
+
+
+
+
+# Create contract object
+
+DEFINE FUNCTION create_contract(id):
+
+    SET contract TO Contract(id)
+
+    SET content, ext, address TO get_content(id)
+
+    contract.set_content(content)
+
+    contract.set_extensions(ext)
+
+    contract.set_address(address)
+
+    doc_creation(contract)
+
+    RETURN contract
+
+
+
+
+
+# data[0]: smart contract written IN solidity
+
+# data[1]: bytecode
+
+DEFINE FUNCTION create_contract_from_address(address, data):
+
+    SET contract TO Contract(address)
+
+    SET ext TO ['.hex']
+
+    SET content TO {'hex': str.split(str(data[1]), 'x')[1]}
+
+    IF data[0] != '':
+
+        ext.append('.sol')
+
+        SET content['sol'] TO data[0][0].get('SourceCode')
+
+    contract.set_content(content)
+
+    contract.set_extensions(ext)
+
+    contract.set_address(address)
+
+    doc_creation(contract)
+
+    RETURN contract
+
+
+
+
+
+DEFINE FUNCTION is_address(param):
+
+    RETURN str(param[:2]) EQUALS '0x'
+
+
+
+
+
+DEFINE FUNCTION get_version(path):
+
+    with open(path, "r+") as f:
+
+        SET line TO f.readline()
+
+        SET version TO str.split(line.replace("pragma solidity ", ""), ';')[0]
+
+    RETURN version
+
+
+
+
+
+DEFINE FUNCTION create_output_dir(path):
+
+    IF path[-1:] != '/':
+
+        path += '/'
+
+    IF path[:0] != '/':
+
+        SET path TO '/' + path
+
+    SET path TO constants.DEFAULT_DIRECTORY + path
+
+    SET constants.DEFAULT_OUTPUT TO path
+
+    IF not os.path.exists(path):
+
+        os.mkdir(path)
+
+        logger.info('Succesfully output path created -> {}'.format(path))
+
+    ELSE:
+
+        logger.warning('The following path already exits {}.'.format(path))
+
+
+
+
+
+DEFINE FUNCTION clean_INPUT_folder():
+
+    SET path TO constants.DEFAULT_DIRECTORY + constants.DEFAULT_INPUT
+
+    FOR filename IN os.listdir(path):
+
+        SET file_path TO os.path.join(path, filename)
+
+        TRY:
+
+            IF os.path.isfile(file_path) or os.path.islink(file_path):
+
+                os.unlink(file_path)
+
+            ELSEIF os.path.isdir(file_path):
+
+                shutil.rmtree(file_path)
+
+        except Exception as e:
+
+            logger.exception('Failed to delete %s. Reason: %s' % (file_path, e))
+

@@ -1,0 +1,140 @@
+DEFINE FUNCTION mongo_connection():
+
+    SET client TO MongoClient("127.0.0.1", 27017)
+
+    SET db TO client[constants.MONGO_DATABASE]
+
+    SET collection TO db[constants.MONGO_COLLECTION]
+
+    RETURN collection
+
+
+
+
+
+DEFINE FUNCTION mongo_results_connection():
+
+    SET client TO MongoClient("127.0.0.1", 27017)
+
+    SET db TO client[constants.MONGO_RESULTS_DATABASE]
+
+    SET collection TO db[constants.MONGO_RESULTS_COLLECTION]
+
+    RETURN collection
+
+
+
+
+
+DEFINE FUNCTION get_contract(id):
+
+    SET collection TO mongo_connection()
+
+    IF type(id) != int:
+
+        SET id TO int(id)
+
+    SET c_contracts TO collection.find({'contract_id': id})
+
+    RETURN c_contracts.next()
+
+
+
+
+
+DEFINE FUNCTION get_contract_by_address(address):
+
+    SET collection TO mongo_connection()
+
+    SET c_contracts TO collection.find({'address': '{}'.format(address)})
+
+    RETURN c_contracts.next()
+
+
+
+
+
+DEFINE FUNCTION get_all_contract_id():
+
+    SET collection TO mongo_connection()
+
+    SET c_contracts TO collection.find({'contract_id': {"$exists": 'true', "$ne": ""}}, no_cursor_timeout=True)
+
+    RETURN c_contracts
+
+
+
+
+
+DEFINE FUNCTION get_range_contract(start_id, end_id):
+
+    SET collection TO mongo_connection()
+
+    SET c_contracts TO collection.find({'contract_id': {"$gte": start_id, "$lte": end_id}}, no_cursor_timeout=True)
+
+    RETURN c_contracts
+
+
+
+
+
+DEFINE FUNCTION get_from_number(start_id):
+
+    SET collection TO mongo_connection()
+
+    SET c_contracts TO collection.find({'contract_id': {"$gte": start_id}}, no_cursor_timeout=True)
+
+    RETURN c_contracts
+
+
+
+
+
+DEFINE FUNCTION insert_result(id, address, field, value, time_elapsed):
+
+    SET collection TO mongo_results_connection()
+
+    SET query TO {'contract_id': id}
+
+    SET new_values TO {
+
+        "$set": {
+
+            "{}".format(field): {
+
+                "output": "{}".format(value),
+
+                "time_elapsed": time_elapsed
+
+            },
+
+            "timestamp": datetime.now()
+
+        },
+
+        "$setOnInsert": {
+
+            "contract_id": id,
+
+            "address": address
+
+        }
+
+    }
+
+    collection.update(query, new_values, upsert=True)
+
+
+
+
+
+DEFINE FUNCTION remove_result(id):
+
+    SET collection TO mongo_connection()
+
+    SET query TO {"contract_id": id}
+
+    SET remove_values TO {"$unset": {"results": ""}}
+
+    collection.update(query, remove_values)
+
